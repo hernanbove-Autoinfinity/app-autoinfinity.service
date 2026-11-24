@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1f;--mu:#6e6e73;--ac:#0a7d5a;--ln:#e5e3de;--wa:#b25a00;--rojo:#d33}
+@media (prefers-color-scheme:dark){:root{--bg:#111;--card:#1c1c1e;--tx:#f2f2f2;--mu:#9a9aa0;--ac:#34c38f;--ln:#2c2c2e;--wa:#ffb340;--rojo:#ff5b5b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px -apple-system,system-ui,sans-serif;line-height:1.4}
+.w{max-width:480px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:22px;margin:0}
+h2{font-size:20px;margin:6px 0 14px}
+p{margin:8px 0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:18px;padding:16px;margin-bottom:12px}
+.tap{cursor:pointer}
+.km{font-size:34px;font-weight:700;letter-spacing:-.5px}
+.mu{color:var(--mu);font-size:14px}
+.bar{height:8px;background:var(--ln);border-radius:4px;margin:14px 0 10px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ac);border-radius:4px}
+button,.btn{font:inherit;border:0;border-radius:14px;padding:14px;width:100%;cursor:pointer;display:block;text-align:center;text-decoration:none}
+.btn{margin-bottom:10px;font-weight:600}
+.p{background:var(--ac);color:#fff;font-weight:600}
+.s{background:transparent;color:var(--ac);border:1px solid var(--ln)}
+.mini{width:auto;padding:8px 12px;font-size:14px;background:transparent;color:var(--ac);border:1px solid var(--ln)}
+.big{padding:20px;font-size:18px;font-weight:700;background:var(--tx);color:var(--bg);margin:6px 0 10px}
+.alt{background:var(--card);color:var(--tx);border:1px solid var(--ln)}
+.rojo{background:var(--rojo);color:#fff}
+.row{display:flex;gap:8px;margin-top:10px}
+.row button,.row .btn{padding:11px;font-size:15px;margin:0;flex:1}
+input,textarea,select{font:inherit;width:100%;padding:13px;border-radius:12px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);margin-bottom:10px}
+label{font-size:14px;color:var(--mu);display:block;margin-bottom:4px}
+.aviso{border-left:4px solid var(--wa);padding:10px 12px;margin-top:12px;background:var(--bg);border-radius:8px;font-size:15px}
+.aviso a{color:var(--ac);font-weight:600}
+.alerta{border-left:4px solid var(--rojo);background:var(--card);padding:12px 14px;border-radius:10px;margin-bottom:12px}
+.badge{display:inline-block;color:#fff;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700}
+.err{color:var(--rojo);font-size:14px;min-height:20px;margin-bottom:6px}
+.hide{display:none!important}
+.bub{padding:12px 14px;border-radius:16px;margin:8px 0;max-width:88%}
+.bub.infi{background:var(--card);border:1px solid var(--ln)}
+.bub.cliente{background:var(--ac);color:#fff;margin-left:auto}
+.foto{max-width:100%;border-radius:12px;display:block;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chip{width:auto;padding:9px 14px;border:1px solid var(--ac);color:var(--ac);background:transparent;font-size:15px}
+.chip.on{background:var(--ac);color:#fff}
+.btnfile{display:block;text-align:center;padding:13px;border-radius:14px;margin-bottom:10px;border:1px solid var(--ln);color:var(--ac);font-weight:600;cursor:pointer}
+.fila{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.env{border-top:1px solid var(--ln);padding:10px 0}
+.stars{display:flex;gap:4px;justify-content:center;margin:8px 0}
+.stars button{width:auto;font-size:30px;background:none;padding:2px;color:var(--wa)}
+details summary{cursor:pointer;font-weight:600}
+.grupo{background:var(--card);border:1px solid var(--ln);border-radius:18px;padding:12px 16px;margin-bottom:12px}
+.grupo summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.grupo summary::-webkit-details-marker{display:none}
+.cnt{background:var(--ac);color:#fff;border-radius:20px;padding:1px 9px;font-size:13px;margin-left:6px}
+.linea{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--ln);cursor:pointer}
+.linea b{font-weight:600;font-size:15px}
+.reloj{color:var(--wa);font-weight:600}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;z-index:10}
+#modal .card{width:100%;max-width:480px;margin:0 auto;border-radius:22px 22px 0 0;padding-bottom:30px;max-height:90vh;overflow:auto}
+</style>
+</head>
+<body>
+<div class="w" id="app"></div>
+<div id="modal" class="hide"><div class="card" id="mc"></div></div>
+
+<!-- Si algo falla, el error se muestra en pantalla en vez de quedar todo negro -->
+<script>
+window.onerror = function (msg, src, linea, col) {
+  var d = document.getElementById('app');
+  if (d) d.innerHTML = '<div class="card"><b>Algo falló al cargar la app</b><p class="mu">Mandale esta captura a Claude:</p>' +
+    '<p style="font-family:monospace;font-size:13px;word-break:break-all">' + String(msg).replace(/</g, '&lt;') + ' (línea ' + linea + ':' + col + ')</p></div>';
+};
+</script>
+
+<script>
+let EMAIL = null, D = { autos: [], perfil: {}, activos: [], admin: false }, INFI = null, CASO = null, ORDEN = 'precio', ESTRELLAS = 0;
+try { EMAIL = localStorage.getItem('ais_email'); } catch (e) {}
+
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n).toLocaleString('es-AR');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => n ? '$' + fmt(n) : 'A consultar';
+const digitos = t => String(t || '').replace(/\D/g, '');
+const telLink = t => 'tel:' + digitos(t);
+function waLink(t, msg) {
+  let d = digitos(t);
+  if (!d.startsWith('54')) d = '549' + d.replace(/^0/, '');
+  return 'https://wa.me/' + d + (msg ? '?text=' + encodeURIComponent(msg) : '');
+}
+const mapsLink = pid => 'https://www.google.com/maps/place/?q=place_id:' + pid;
+// Ojo: Google borra todo lo que sigue a una barra con asterisco, por eso se arma en dos partes
+const ACEPTA_FOTOS = 'image/' + '*';
+const colorUrg = u => u === 'alta' ? 'var(--rojo)' : u === 'media' ? 'var(--wa)' : 'var(--ac)';
+const textoUrg = u => u === 'alta' ? 'Gravedad alta' : u === 'media' ? 'Gravedad media' : 'Gravedad baja';
+
+function run(fn, args, ok, errId, btn) {
+  if (btn) { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = 'Un momento…'; }
+  const fin = () => { if (btn) { btn.disabled = false; btn.textContent = btn.dataset.t; } };
+  google.script.run
+    .withSuccessHandler(r => { fin(); ok(r); })
+    .withFailureHandler(e => { fin(); if (errId && $(errId)) $(errId).textContent = e.message; else alert(e.message); })
+    [fn](...args);
+}
+function view(h) { $('app').innerHTML = h; window.scrollTo(0, 0); }
+function cargando(t) { view('<p class="mu">' + (t || 'Cargando…') + '</p>'); }
+function abrir(h) { $('mc').innerHTML = h; $('modal').classList.remove('hide'); }
+function cerrar() { $('modal').classList.add('hide'); }
+$('modal').onclick = e => { if (e.target.id === 'modal') cerrar(); };
+const volver = (t, fn) => `<button class="mini" onclick="${fn || 'cargar()'}">← ${t || 'Inicio'}</button>`;
+
+// ================= CONTACTO =================
+let TIPO_CONTACTO = 'Sugerencia';
+function formContacto() {
+  TIPO_CONTACTO = 'Sugerencia';
+  abrir(`<h2>Contactanos</h2><p class="mu">Sugerencias, reclamos, lo que quieras. Lo leemos nosotros.</p>
+    <div class="chips" id="tc">${['Sugerencia', 'Reclamo', 'Consulta'].map(t => `<button class="chip ${t === TIPO_CONTACTO ? 'on' : ''}" onclick="TIPO_CONTACTO='${t}';[...$('tc').children].forEach(x=>x.classList.toggle('on',x.textContent==='${t}'))">${t}</button>`).join('')}</div>
+    <textarea id="ct" rows="5" placeholder="Escribí acá"></textarea><div class="err" id="me"></div>
+    <button class="p" onclick="run('enviarContacto',[EMAIL,TIPO_CONTACTO,$('ct').value],gracias,'me',this)">Enviar</button>`);
+}
+function gracias() {
+  abrir(`<h2>¡Gracias!</h2><p>Recibimos tu mensaje. Te respondemos cuanto antes: normalmente en menos de 24 horas, a tu mail.</p>
+    <button class="p" onclick="cerrar()">Listo</button>`);
+}
+
+// ================= RESEÑAS =================
+const fotoDrive = id => 'https://drive.google.com/thumbnail?id=' + id + '&sz=w800';
+function bloqueResenas(r) {
+  if (!r || !r.n) return `<p class="mu">⭐ Reseñas de Autoinfinity: todavía nadie lo calificó.</p>`;
+  if (r.faltan) return `<p class="mu">⭐ Reseñas de Autoinfinity: todavía faltan reseñas (${r.n} de 5).</p>`;
+  return `<div style="margin:12px 0"><b>Reseñas de Autoinfinity · ★ ${r.prom} (${r.n})</b>` +
+    r.lista.map(x => `<div class="env"><div class="fila"><b>${esc(x.nombre)}</b><span class="mu">${x.fecha}</span></div>
+      <div style="color:var(--wa)">${'★'.repeat(x.estrellas)}${'☆'.repeat(5 - x.estrellas)}</div>
+      ${x.trabajo ? `<div class="mu">${esc(x.trabajo)}</div>` : ''}
+      ${x.texto ? `<p style="margin:6px 0">${esc(x.texto)}</p>` : ''}
+      ${x.foto ? `<img class="foto" loading="lazy" src="${fotoDrive(x.foto)}">` : ''}</div>`).join('') + `</div>`;
+}
+
+// ================= CUENTA REGRESIVA =================
+function falta(ms) {
+  let m = Math.max(0, Math.round((ms - Date.now()) / 60000));
+  if (!m) return 'llegando…';
+  const d = Math.floor(m / 1440), hs = Math.floor((m % 1440) / 60), mi = m % 60;
+  return 'faltan ' + (d ? d + ' d ' : '') + (d || hs ? hs + ' h ' : '') + mi + ' min';
+}
+setInterval(() => document.querySelectorAll('[data-vence]').forEach(el => el.textContent = falta(Number(el.dataset.vence))), 30000);
+
+// ================= INGRESO =================
+function login() {
+  view(`<h1 style="margin-top:20px">Autoinfinity Service</h1>
+    <p class="mu" style="margin-bottom:20px">Tu auto, siempre al día.</p>
+    <div class="card">
+      <input id="em" type="email" placeholder="Tu email" autocomplete="email">
+      <input id="no" placeholder="Tu nombre">
+      <input id="co" placeholder="Código de invitación" autocapitalize="characters">
+      <div class="err" id="er"></div>
+      <button class="p" onclick="entrar(this)">Entrar</button>
+    </div>`);
+}
+function entrar(b) {
+  run('ingresar', [$('em').value, $('no').value, $('co').value], e => {
+    EMAIL = e;
+    try { localStorage.setItem('ais_email', e); } catch (x) {}
+    cargar();
+  }, 'er', b);
+}
+function salir() {
+  try { localStorage.removeItem('ais_email'); } catch (e) {}
+  EMAIL = null; login();
+}
+function cargar() { cargando(); run('inicio', [EMAIL], setD); }
+function setD(d) { D = d; cerrar(); home(); }
+
+// ================= INICIO =================
+function home() {
+  let h = `<div class="top"><h1>Autoinfinity Service</h1><button class="mini" onclick="formPerfil()">Perfil</button></div>`;
+  // Pedidos agrupados: cada grupo es una carpeta que se abre al tocarla
+  [['listo', '📋 Informes listos', true], ['esperando', '⏳ Esperando cotizaciones', false], ['calificar', '⭐ Para calificar', false]].forEach(([g, nombre, abierto]) => {
+    const lista = D.activos.filter(c => c.grupo === g);
+    if (!lista.length) return;
+    h += `<details class="grupo" ${abierto || D.activos.length <= 2 ? 'open' : ''}><summary><b>${nombre}<span class="cnt">${lista.length}</span></b><span class="mu">▾</span></summary>` +
+      lista.map(c => `<div class="linea" onclick="abrirCaso('${c.id}')"><b>${esc(c.titulo)}</b>
+        <span class="mu" style="text-align:right;white-space:nowrap">${g === 'esperando' && c.modo !== 'urgente' && c.venceMs
+          ? `<span class="reloj" data-vence="${c.venceMs}">${falta(c.venceMs)}</span>` : esc(c.estadoTexto)}</span></div>`).join('') + `</details>`;
+  });
+  if (!D.autos.length) {
+    h += `<div class="card"><p style="margin-top:0">Todavía no cargaste ningún auto.</p>
+      <button class="p" onclick="formAuto()">Agregar mi auto</button></div>`;
+  }
+  D.autos.forEach(a => {
+    const pct = Math.max(2, Math.min(100, (10000 - a.faltanKm) / 100));
+    h += `<div class="card">
+      <div class="mu">${esc(a.marca)} ${esc(a.modelo)} ${esc(a.anio)}</div>
+      <div class="km">${fmt(a.kmEstimado)} km</div>
+      <div class="mu">estimados · última carga ${a.ultimaLectura}</div>
+      ${a.pedirLectura ? `<div class="aviso">Hace ${a.diasSinCargar} días que no cargás los km.
+        <a href="#" onclick="formKm('${a.id}');return false">Actualizar ahora</a></div>` : ''}
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div>Próximo service: <b>${fmt(a.proximoService)} km</b></div>
+      <div class="mu">Faltan ${fmt(a.faltanKm)} km · unos ${a.faltanDias} días</div>
+      <div class="row">
+        <button class="s" onclick="formKm('${a.id}')">Actualizar km</button>
+        <button class="s" onclick="formCompartir('${a.id}')">Compartir</button>
+      </div>
+      <button class="s" style="margin-top:8px" onclick="cotizarService('${a.id}', this)">Cotizar el service de los ${fmt(a.proximoService)} km</button>
+    </div>`;
+  });
+  if (D.autos.length) h += `<button class="s" style="margin-bottom:14px" onclick="formAuto()">+ Agregar otro auto</button>`;
+  h += `<button class="big" onclick="nuevoInfi('problema')">Tengo un problema</button>
+    <button class="big alt" onclick="nuevoInfi('presupuesto')">Pedir presupuesto</button>
+    <div class="row"><button class="s" onclick="verHistorial()">Historial</button><button class="s" onclick="formContacto()">Contactanos</button></div>
+    <button class="s" style="margin-top:10px;border:0" onclick="salir()">Salir</button>`;
+  if (D.admin) h += `<button class="s" style="margin-top:10px" onclick="verAdmin()">Panel Autoinfinity</button>`;
+  if (D.actualizador) h += `<a class="btn s" style="margin-top:10px" href="${esc(D.actualizador)}" target="_blank">⬆ Instalar actualización</a>`;
+  view(h);
+}
+
+// ================= AUTOS =================
+function formAuto() {
+  abrir(`<h2>Agregar auto</h2>
+    <input id="ma" placeholder="Marca (ej: Toyota)">
+    <input id="mo" placeholder="Modelo (ej: Corolla)">
+    <input id="an" type="number" inputmode="numeric" placeholder="Año">
+    <input id="kmi" type="number" inputmode="numeric" placeholder="Kilómetros actuales">
+    <label>¿Dónde duerme el auto? (para buscar talleres cerca)</label>
+    <input id="di" placeholder="Calle, número y localidad">
+    <div class="err" id="me"></div>
+    <button class="p" onclick="guardarAuto(this)">Guardar</button>`);
+}
+function guardarAuto(b) {
+  const d = { marca: $('ma').value.trim(), modelo: $('mo').value.trim(), anio: $('an').value,
+              km: $('kmi').value, direccion: $('di').value.trim() };
+  run('agregarAuto', [EMAIL, d], setD, 'me', b);
+}
+function formKm(id) {
+  const a = D.autos.find(x => x.id === id);
+  abrir(`<h2>Actualizar kilómetros</h2>
+    <p class="mu">Mirá el tablero de tu ${esc(a.marca)} ${esc(a.modelo)} y poné el número exacto.</p>
+    <input id="kmn" type="number" inputmode="numeric" placeholder="Ej: ${a.kmEstimado}">
+    <div class="err" id="me"></div>
+    <button class="p" onclick="run('cargarKm',[EMAIL,'${id}',$('kmn').value],setD,'me',this)">Guardar</button>`);
+}
+function formCompartir(id) {
+  abrir(`<h2>Compartir auto</h2>
+    <p class="mu">La otra persona va a ver este auto y podrá usar la app con él. Tiene que entrar con este mismo email.</p>
+    <input id="oe" type="email" placeholder="Email de la otra persona">
+    <div class="err" id="me"></div>
+    <button class="p" onclick="run('compartir',[EMAIL,'${id}',$('oe').value],setD,'me',this)">Compartir</button>`);
+}
+function formPerfil() {
+  const p = D.perfil;
+  abrir(`<h2>Perfil</h2>
+    <label>Tu nombre</label><input id="pn" value="${esc(p.nombre)}">
+    <label>Tu mecánico de confianza</label>
+    <input id="pmn" placeholder="Nombre" value="${esc(p.mecanicoNombre)}">
+    <input id="pmt" type="tel" placeholder="Teléfono con código de área (ej: 11 5555 5555)" value="${esc(p.mecanicoTel)}">
+    <label>Tu seguro (para grúa o auxilio)</label>
+    <input id="psn" placeholder="Compañía" value="${esc(p.seguroNombre)}">
+    <input id="pst" type="tel" placeholder="Teléfono de auxilio" value="${esc(p.seguroTel)}">
+    <div class="err" id="me"></div>
+    <button class="p" onclick="guardarPerfil(this)">Guardar</button>`);
+}
+function guardarPerfil(b) {
+  run('guardarPerfil', [EMAIL, { nombre: $('pn').value, mecanicoNombre: $('pmn').value, mecanicoTel: $('pmt').value,
+    seguroNombre: $('psn').value, seguroTel: $('pst').value }], setD, 'me', b);
+}
+function cotizarService(id, b) {
+  run('casoService', [EMAIL, id], r => abrirCaso(r.id), null, b);
+}
+
+// ================= INFI =================
+function nuevoInfi(tipo) {
+  if (!D.autos.length) return abrir(`<h2>Primero cargá tu auto</h2><button class="p" onclick="formAuto()">Agregar auto</button>`);
+  INFI = { tipo, autoId: D.autos[0].id, charla: [], foto: null, fotoUrl: '', opciones: [] };
+  pintarInfi();
+}
+function pintarInfi() {
+  const titulo = INFI.tipo === 'problema' ? 'Tengo un problema' : 'Pedir presupuesto';
+  const intro = INFI.tipo === 'problema'
+    ? 'Hola, soy Infi. Contame qué le pasa al auto: escribilo, dictalo con el micrófono del teclado, o mandame una foto (por ejemplo, de una luz del tablero).'
+    : 'Hola, soy Infi. ¿Qué trabajo querés cotizar? Por ejemplo: cambiar las 4 cubiertas. Si es por cubiertas, mandame una foto del costado de la goma y saco la medida.';
+  let h = `<div class="top">${volver()}</div><h2>${titulo}</h2>`;
+  if (D.autos.length > 1 && !INFI.charla.length) {
+    h += `<label>¿Qué auto?</label><select onchange="INFI.autoId=this.value">` +
+      D.autos.map(a => `<option value="${a.id}" ${a.id === INFI.autoId ? 'selected' : ''}>${esc(a.marca)} ${esc(a.modelo)}</option>`).join('') +
+      `</select>`;
+  }
+  h += `<div class="bub infi">${intro}</div>`;
+  INFI.charla.forEach((m, i) => {
+    h += `<div class="bub ${m.rol}">${i === 0 && INFI.fotoUrl ? `<img src="${INFI.fotoUrl}" class="foto">` : ''}${esc(m.texto)}</div>`;
+  });
+  if (INFI.opciones.length) {
+    h += `<div class="chips">` + INFI.opciones.map((o, i) => `<button class="chip" onclick="opcion(${i})">${esc(o)}</button>`).join('') + `</div>`;
+  }
+  if (!INFI.charla.length) {
+    h += `<img id="pv" class="foto ${INFI.fotoUrl ? '' : 'hide'}" src="${INFI.fotoUrl}">
+      <label class="btnfile">📷 Sacar o elegir una foto<input type="file" accept="${ACEPTA_FOTOS}" class="hide" onchange="leerFoto(this)"></label>`;
+  }
+  h += `<textarea id="tx" rows="3" placeholder="Escribí acá, o tocá el micrófono del teclado para hablar"></textarea>
+    <div class="err" id="me"></div>
+    <button class="p" id="env" onclick="enviarInfi(this)">Enviar</button>`;
+  view(h);
+  if (INFI.charla.length) window.scrollTo(0, document.body.scrollHeight);
+}
+function leerFoto(inp) {
+  const fl = inp.files[0]; if (!fl) return;
+  const img = new Image();
+  img.onload = () => {
+    const max = 1200, k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    INFI.fotoUrl = c.toDataURL('image/jpeg', 0.8);
+    INFI.foto = INFI.fotoUrl.split(',')[1];
+    $('pv').src = INFI.fotoUrl; $('pv').classList.remove('hide');
+  };
+  img.src = URL.createObjectURL(fl);
+}
+function opcion(i) { $('tx').value = INFI.opciones[i]; enviarInfi($('env')); }
+function enviarInfi(b) {
+  const txt = $('tx').value.trim();
+  if (!txt && !(INFI.foto && !INFI.charla.length)) { $('me').textContent = 'Escribí algo o mandá una foto'; return; }
+  INFI.charla.push({ rol: 'cliente', texto: txt });
+  b.disabled = true; b.textContent = 'Infi está pensando…';
+  google.script.run
+    .withSuccessHandler(r => {
+      if (r.pregunta) { INFI.charla.push({ rol: 'infi', texto: r.pregunta }); INFI.opciones = r.opciones || []; pintarInfi(); }
+      else resultado(r.caso);
+    })
+    .withFailureHandler(e => { INFI.charla.pop(); b.disabled = false; b.textContent = 'Enviar'; $('me').textContent = e.message; })
+    .hablarInfi(EMAIL, INFI.autoId, INFI.tipo, INFI.charla, INFI.foto);
+}
+function resultado(c) {
+  const p = D.perfil;
+  let h = `<div class="top">${volver()}</div>`;
+  if (c.tipo === 'problema') h += `<span class="badge" style="background:${colorUrg(c.urgencia)}">${textoUrg(c.urgencia)}</span>`;
+  h += `<h2>${esc(c.titulo)}</h2>`;
+  if (c.seguridad) h += `<div class="alerta"><b>Primero, tu seguridad</b><br>${esc(c.seguridad)}</div>`;
+  if (c.bomberos) h += `<a class="btn rojo" href="tel:100">Llamar a bomberos (100)</a><a class="btn rojo" href="tel:911">Emergencias (911)</a>`;
+  h += `<div class="card"><p style="margin-top:0">${esc(c.explicacion)}</p>
+    ${c.queHacer ? `<p><b>Qué hacer:</b> ${esc(c.queHacer)}</p>` : ''}
+    <div class="mu">Lo resuelve: ${esc(c.tipoTaller)}</div></div>`;
+  if (c.tipo === 'problema') {
+    if (p.seguroTel) h += `<a class="btn s" href="${telLink(p.seguroTel)}">Llamar a mi seguro${p.seguroNombre ? ' (' + esc(p.seguroNombre) + ')' : ''} · grúa</a>`;
+    if (p.mecanicoTel) h += `<div class="row" style="margin-bottom:10px">
+      <a class="btn s" href="${telLink(p.mecanicoTel)}">Llamar a ${esc(p.mecanicoNombre || 'mi mecánico')}</a>
+      <a class="btn s" href="${waLink(p.mecanicoTel, 'Hola! Te escribo por mi auto: ' + c.titulo)}" target="_blank">WhatsApp</a></div>`;
+    if (!p.seguroTel || !p.mecanicoTel) h += `<p class="mu">Tip: cargá tu mecánico y tu seguro en Perfil para llamarlos con un toque.</p>`;
+  }
+  h += `<button class="p" onclick="elegirModo('${c.id}')">Pedir cotizaciones a talleres cerca</button>
+    <button class="s" style="margin-top:10px" onclick="cargar()">Listo, volver al inicio</button>`;
+  view(h);
+}
+
+// ================= COTIZACIONES =================
+function elegirModo(id) {
+  abrir(`<h2>¿Para cuándo lo necesitás?</h2>
+    <button class="p" onclick="pedir('${id}','normal',this)">Normal (recomendado)</button>
+    <p class="mu">En 48 horas te llega un informe con varios talleres de tu zona compitiendo por precio.</p>
+    <button class="s" onclick="pedir('${id}','urgente',this)">Urgente</button>
+    <p class="mu">Las respuestas te van llegando en unas 3 horas hábiles (lunes a viernes de 9 a 18, sábados de 9 a 13). Van a ser menos talleres.</p>
+    <div class="err" id="me"></div>`);
+}
+function pedir(id, modo, b) { run('pedirCotizaciones', [EMAIL, id, modo], c => { cerrar(); pintarCaso(c); }, 'me', b); }
+function abrirCaso(id) { cargando(); run('verCaso', [EMAIL, id], pintarCaso); }
+
+function pintarCaso(c) {
+  CASO = c;
+  let h = `<div class="top">${volver()}</div><div class="mu">${esc(c.auto)} · ${c.fecha}</div><h2>${esc(c.titulo)}</h2>`;
+
+  if (c.estado === 'nuevo') {
+    h += `<div class="card"><p style="margin-top:0">${esc(c.explicacion)}</p>
+      <button class="p" onclick="elegirModo('${c.id}')">Pedir cotizaciones a talleres cerca</button></div>`;
+  }
+  if (c.estado === 'cotizando') {
+    h += `<div class="card">` + (c.modo === 'urgente'
+      ? `<b>Pedido urgente</b><p class="mu">Estamos consultando talleres cerca tuyo. Las respuestas aparecen acá a medida que llegan.</p>
+         <div class="row"><button class="s" onclick="abrirCaso('${c.id}')">Actualizar</button>
+         <button class="s" onclick="cortar('${c.id}',this)">No quiero recibir más</button></div>`
+      : `<b>Estamos consultando talleres cerca tuyo</b><p class="mu">El ${c.vence} te llega el informe con todas las cotizaciones. Te avisamos por mail.</p>
+         <p style="margin:6px 0 4px">⏳ <span class="reloj" data-vence="${c.venceMs}">${falta(c.venceMs)}</span></p>
+         <p class="mu">Ya respondieron ${c.respondieron} de ${c.consultados} talleres.</p>`) +
+      (c.pedido ? `<p class="mu" style="margin-top:10px"><b>Lo que pedimos:</b> ${esc(c.pedido)}</p>` : '') +
+      `<div class="row"><button class="s" onclick="formModificar()">Modificar pedido</button>
+         <button class="s" onclick="cortar('${c.id}',this)">Ya lo resolví</button></div>` +
+      (c.admin && c.modo !== 'urgente' ? `<button class="s" style="margin-top:10px;border-style:dashed" onclick="run('forzarInforme',[EMAIL,'${c.id}'],pintarCaso,null,this)">⚡ Recibir informe ya (solo prueba)</button>` : '') +
+      `</div>`;
+  }
+  if (c.elegido) {
+    const el = c.elegido;
+    h += `<div class="card"><div class="mu">Elegiste</div><b>${esc(el.nombre)}</b>
+      <div class="mu">${esc(el.direccion)}</div>
+      <div class="row"><a class="btn s" href="${waLink(el.telefono, 'Hola! Vengo de Autoinfinity Service por el presupuesto de: ' + c.titulo)}" target="_blank">WhatsApp</a>
+      <a class="btn s" href="${telLink(el.telefono)}">Llamar</a></div></div>`;
+    if (!c.calificacion) {
+      ESTRELLAS = 0;
+      h += `<div class="card"><b>¿Cómo te fue?</b><p class="mu">Tu opinión ayuda a otros clientes.</p>
+        <div class="stars" id="st">${[1,2,3,4,5].map(n => `<button onclick="estrellas(${n})">☆</button>`).join('')}</div>
+        <textarea id="cm" rows="3" placeholder="Contá cómo fue tu experiencia: atención, precio, tiempos, prolijidad"></textarea>
+        <img id="pvc" class="foto hide">
+        <label class="btnfile">📷 Agregar una foto (opcional)<input type="file" accept="${ACEPTA_FOTOS}" class="hide" onchange="fotoCalif(this)"></label>
+        <div class="err" id="me"></div>
+        <button class="p" onclick="enviarCalif(this)">Enviar calificación</button></div>`;
+    } else {
+      h += `<div class="card"><div class="mu">Tu calificación</div><div>${'★'.repeat(c.calificacion)}${'☆'.repeat(5 - c.calificacion)}</div>
+        ${c.comentario ? `<p>${esc(c.comentario)}</p>` : ''}</div>`;
+    }
+  } else if (c.cotizaciones.length) {
+    h += `<h2>Cotizaciones (${c.cotizaciones.length})</h2>` + listaCots();
+    if (c.estado === 'listo') h += `<button class="s" style="margin-bottom:12px" onclick="cortar('${c.id}',this)">Ya lo resolví por mi cuenta</button>`;
+  } else if (c.estado === 'listo' || c.estado === 'cerrado') {
+    h += `<div class="card"><p style="margin-top:0">Esta vez ningún taller respondió a tiempo.</p></div>`;
+  }
+
+  h += `<details class="card"><summary>Detalle del caso</summary>
+    ${c.descripcion ? `<p>"${esc(c.descripcion)}"</p>` : ''}
+    ${c.explicacion ? `<p>${esc(c.explicacion)}</p>` : ''}
+    ${c.queHacer ? `<p><b>Qué hacer:</b> ${esc(c.queHacer)}</p>` : ''}
+    ${c.seguridad ? `<p><b>Seguridad:</b> ${esc(c.seguridad)}</p>` : ''}
+    ${c.fotoUrl ? `<p><a href="${c.fotoUrl}" target="_blank" style="color:var(--ac)">Ver foto</a></p>` : ''}
+    </details>`;
+  view(h);
+}
+function listaCots() {
+  const cs = CASO.cotizaciones.slice();
+  if (ORDEN === 'precio') cs.sort((a, b) => (a.precio || 1e15) - (b.precio || 1e15));
+  if (ORDEN === 'resenas') cs.sort((a, b) => (b.rating - a.rating) || (b.resenas - a.resenas));
+  if (ORDEN === 'cerca') cs.sort((a, b) => (a.distancia == null ? 1e9 : a.distancia) - (b.distancia == null ? 1e9 : b.distancia));
+  return `<div class="chips">` + [['precio', 'Más barato'], ['resenas', 'Mejores reseñas'], ['cerca', 'Más cerca']]
+    .map(([k, t]) => `<button class="chip ${ORDEN === k ? 'on' : ''}" onclick="ORDEN='${k}';pintarCaso(CASO)">${t}</button>`).join('') + `</div>` +
+    cs.map(q => `<div class="card tap" onclick="verCot('${q.placeId}')">
+      <div class="fila"><b>${esc(q.nombre)}</b><b>${money(q.precio)}</b></div>
+      <div class="mu">${q.rating ? '⭐ ' + q.rating + ' (' + q.resenas + ' reseñas en Google)' : 'Sin reseñas en Google'}${q.distancia != null ? ' · ' + q.distancia + ' km' : ''}</div>
+      <div class="mu">${q.interna && !q.interna.faltan ? 'Autoinfinity: ★ ' + q.interna.prom + ' (' + q.interna.n + ' reseñas)' : 'Autoinfinity: faltan reseñas'}</div>
+      <div class="mu">${esc(q.cuando)}</div></div>`).join('');
+}
+function verCot(pid) {
+  const q = CASO.cotizaciones.find(x => x.placeId === pid);
+  const google = !pid.startsWith('M');
+  abrir(`<h2>${esc(q.nombre)}</h2>
+    <div class="km" style="font-size:28px">${money(q.precio)}</div>
+    ${q.incluye ? `<p><b>Incluye:</b> ${esc(q.incluye)}</p>` : ''}
+    ${q.cuando ? `<p><b>Cuándo:</b> ${esc(q.cuando)}</p>` : ''}
+    <p class="mu">${esc(q.direccion)}${q.distancia != null ? ' · a ' + q.distancia + ' km' : ''}</p>
+    ${google ? `<p class="mu">Google: ${q.rating ? '★ ' + q.rating + ' (' + q.resenas + ' reseñas)' : 'sin reseñas'}</p>
+      <a class="btn s" href="${fichaGoogle({ nombre: q.nombre, direccion: q.direccion, placeId: pid })}" target="_blank">Ver reseñas y fotos en Google</a>` : ''}
+    ${bloqueResenas(q.interna)}
+    <div class="row" style="margin-bottom:10px">
+      <a class="btn s" href="${waLink(q.telefono, 'Hola! Vengo de Autoinfinity Service por el presupuesto de: ' + CASO.titulo)}" target="_blank">WhatsApp</a>
+      <a class="btn s" href="${telLink(q.telefono)}">Llamar</a></div>
+    <div class="err" id="me"></div>
+    <button class="p" onclick="run('elegirTaller',[EMAIL,CASO.id,'${pid}'],c=>{cerrar();pintarCaso(c)},'me',this)">Elegí este taller</button>
+    <p class="mu">Al elegirlo cerramos el pedido y les avisamos a los demás.</p>`);
+}
+function formModificar() {
+  abrir(`<h2>Modificar pedido</h2>
+    <p class="mu">Cambiá lo que necesitás (por ejemplo, 2 cubiertas en vez de 4). Les avisamos a los talleres y las cotizaciones anteriores se borran.</p>
+    <textarea id="mp" rows="3">${esc(CASO.pedido)}</textarea>
+    <div class="err" id="me"></div>
+    <button class="p" onclick="run('modificarPedido',[EMAIL,CASO.id,$('mp').value],c=>{cerrar();pintarCaso(c)},'me',this)">Guardar cambio</button>`);
+}
+function cortar(id, b) {
+  if (!confirm('¿Cerrar el pedido? Les avisamos a los talleres que ya no hace falta.')) return;
+  run('cortarCaso', [EMAIL, id], pintarCaso, null, b);
+}
+function estrellas(n) {
+  ESTRELLAS = n;
+  $('st').innerHTML = [1,2,3,4,5].map(i => `<button onclick="estrellas(${i})">${i <= n ? '★' : '☆'}</button>`).join('');
+}
+let FOTO_CALIF = null;
+function fotoCalif(inp) {
+  const fl = inp.files[0]; if (!fl) return;
+  const img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 1200 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const url = c.toDataURL('image/jpeg', 0.8); FOTO_CALIF = url.split(',')[1];
+    $('pvc').src = url; $('pvc').classList.remove('hide');
+  };
+  img.src = URL.createObjectURL(fl);
+}
+function enviarCalif(b) {
+  if (!ESTRELLAS) { $('me').textContent = 'Tocá las estrellas'; return; }
+  run('calificar', [EMAIL, CASO.id, ESTRELLAS, $('cm').value.trim(), FOTO_CALIF], c => { FOTO_CALIF = null; pintarCaso(c); }, 'me', b);
+}
+
+// ================= HISTORIAL =================
+function verHistorial() {
+  cargando();
+  run('historial', [EMAIL], lista => {
+    let h = `<div class="top">${volver()}</div><h2>Historial</h2>`;
+    if (!lista.length) h += `<p class="mu">Todavía no hay nada. Acá va a quedar todo lo que hagas con tu auto.</p>`;
+    const icono = { problema: '⚠️', presupuesto: '🧾', service: '🔧' };
+    lista.forEach(c => {
+      h += `<div class="card tap" onclick="abrirCaso('${c.id}')">
+        <div class="fila"><b>${icono[c.tipo] || ''} ${esc(c.titulo)}</b></div>
+        <div class="mu">${esc(c.auto)} · ${c.fecha}</div></div>`;
+    });
+    view(h);
+  });
+}
+
+// ================= PANEL AUTOINFINITY =================
+const estadoEnv = e => ({ pendiente: 'Sin enviar', enviado: 'Enviado', respondio: 'Respondió ✓', 'no cotiza': 'No cotiza' }[e] || e);
+let AQUI = null;
+// Mapa con el pin del taller (no la ruta) y link a su ficha de Google con reseñas y fotos
+const mapaEmbed = e => 'https://maps.google.com/maps?q=' + encodeURIComponent(e.nombre + ', ' + (e.direccion || (e.lat + ',' + e.lng))) + '&z=15&output=embed';
+const fichaGoogle = e => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(e.nombre + ' ' + (e.direccion || '')) +
+  (e.placeId.startsWith('M') ? '' : '&query_place_id=' + e.placeId);
+function kmEntre(a, b) {
+  const r = x => x * Math.PI / 180, h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+  return Math.round(2 * 6371 * Math.asin(Math.sqrt(h)) * 10) / 10;
+}
+function verAdmin() {
+  cargando();
+  let listo = false;
+  const seguir = () => { if (listo) return; listo = true; run('panelAdmin', [EMAIL], pintarAdmin); };
+  try {
+    navigator.geolocation.getCurrentPosition(p => { AQUI = { lat: p.coords.latitude, lng: p.coords.longitude }; seguir(); },
+      () => seguir(), { timeout: 6000, maximumAge: 300000 });
+    setTimeout(seguir, 7000);
+  } catch (e) { seguir(); }
+}
+function pintarAdmin(d) {
+  cerrar();
+  let h = `<div class="top">${volver()}<button class="mini" onclick="verAdmin()">Actualizar</button></div><h2>Panel Autoinfinity</h2>`;
+  if (!AQUI) h += `<p class="mu">No pude saber dónde estás (permiso de ubicación). Las distancias son desde donde duerme el auto.</p>`;
+  if (!d.pedidos.length && !d.cierres.length) h += `<p class="mu">No hay nada pendiente.</p>`;
+  // Base de talleres por zona
+  const b = d.base || { zonas: [], invitarWa: [], anotados: 0 };
+  h += `<details class="grupo"><summary><b>🗺️ Base de talleres<span class="cnt">${b.anotados}</span></b><span class="mu">▾</span></summary>
+    <p class="mu">Cada zona sale de donde duerme el auto de un cliente. Todos los días se busca un rubro por zona hasta tener ${5} anotados por rubro.</p>` +
+    b.zonas.map(z => `<div class="env"><div class="fila"><b>${esc(z.nombre)}</b>
+      <button class="mini" onclick="run('reclutarAhora',[EMAIL,'${z.id}'],pintarAdmin,null,this)">Buscar ahora</button></div>
+      <div class="chips">` + z.rubros.map(r => `<span class="chip" style="cursor:default;font-size:13px;padding:5px 10px;${r.anotados >= 5 ? 'background:var(--ac);color:#fff' : r.buscado ? '' : 'opacity:.5'}">
+        ${esc(r.rubro)} ${r.anotados}/5${r.km > 8 ? ' · ' + r.km + 'km' : ''}</span>`).join('') + `</div></div>`).join('') +
+    `<div class="row"><input id="nz" placeholder="Sumar zona: dirección o barrio" style="margin:0"><button class="mini" onclick="run('agregarZona',[EMAIL,$('nz').value],pintarAdmin,null,this)">Sumar</button></div></details>`;
+  if (b.invitarWa.length) {
+    h += `<details class="grupo"><summary><b>📲 Invitar por WhatsApp<span class="cnt">${b.invitarWa.length}</span></b><span class="mu">▾</span></summary>
+      <p class="mu">Talleres sin mail. El mensaje lleva un link para que se anoten solos.</p>` +
+      b.invitarWa.map(t => `<div class="env fila"><span><b>${esc(t.nombre)}</b><br><span class="mu">${esc(t.tipo)} · ${esc(t.telefono)}</span></span>
+        <a class="btn s" style="width:auto;margin:0;padding:9px 14px" href="${t.wa}" target="_blank" onclick="google.script.run.marcarInvitado(EMAIL,'${t.placeId}');this.textContent='Enviado ✓'">WhatsApp</a></div>`).join('') + `</details>`;
+  }
+  d.pedidos.forEach(p => {
+    const auto = p.autoLat ? { lat: p.autoLat, lng: p.autoLng } : null;
+    h += `<div class="card"><div class="mu">${p.modo === 'urgente' ? '<b style="color:var(--rojo)">URGENTE</b> · ' : ''}vence ${p.vence} · ${esc(p.auto)}</div>
+      <b>${esc(p.titulo)}</b>`;
+    p.envios.forEach(e => {
+      const dest = e.lat ? { lat: e.lat, lng: e.lng } : null;
+      const desde = AQUI || auto;
+      const km = dest && desde ? kmEntre(desde, dest) : null;
+      h += `<div class="env"><div class="fila"><b>${esc(e.nombre)}</b><span class="mu">${estadoEnv(e.estado)}</span></div>
+        <div style="margin:4px 0">${e.lista === 'si' ? '<span class="badge" style="background:var(--ac)">En la lista ✓</span>'
+          : e.primeraVez ? '<span class="badge" style="background:var(--wa)">Nuevo · va con presentación</span>' : ''}</div>
+        ${e.rating ? `<div class="mu">⭐ ${e.rating} (${e.resenas} reseñas)</div>` : ''}
+        <div class="mu">${e.telefono ? (e.celular ? '📱 Celular / WhatsApp: ' : '☎️ Fijo: ') + esc(e.telefono) : 'Sin teléfono'}</div>
+        ${e.direccion ? `<div class="mu">📍 ${esc(e.direccion)}</div>` : ''}
+        ${km != null ? `<div class="mu">🚗 a ${km} km ${AQUI ? 'de donde estás' : 'de donde duerme el auto'}${AQUI && e.kmAuto != null ? ' · ' + e.kmAuto + ' km del auto' : ''}</div>` : ''}
+        ${dest ? `<iframe src="${mapaEmbed(e)}" loading="lazy" style="width:100%;height:170px;border:0;border-radius:12px;margin:8px 0"></iframe>` : ''}
+        ${e.placeId.startsWith('M') ? '' : `<a href="${fichaGoogle(e)}" target="_blank" style="color:var(--ac);font-weight:600;font-size:14px">Ver reseñas y fotos en Google Maps</a>`}`;
+      if (e.estado === 'pendiente' || e.estado === 'enviado') {
+        h += `<div class="row">
+          ${e.wa ? `<a class="btn s" href="${e.wa}" target="_blank" onclick="marcar('${p.casoId}','${e.placeId}','enviado',false)">WhatsApp</a>` : ''}
+          ${e.telefono ? `<a class="btn s" href="${e.tel}" onclick="marcar('${p.casoId}','${e.placeId}','enviado',false)">Llamar</a>` : ''}
+          <button class="s" onclick="formResp('${p.casoId}','${e.placeId}')">Respuesta</button>
+          <button class="s" onclick="marcar('${p.casoId}','${e.placeId}','no cotiza',true)">No cotiza</button></div>`;
+      }
+      if (e.lista !== 'si' && !e.placeId.startsWith('M')) {
+        h += `<div class="row"><button class="s" onclick="run('marcarLista',[EMAIL,'${e.placeId}','si'],pintarAdmin,null,this)">✓ Se suma a la lista</button>
+          <button class="s" onclick="if(confirm('¿Lista negra? No le vamos a escribir más.'))run('marcarLista',[EMAIL,'${e.placeId}','no'],pintarAdmin,null,this)">✕ No quiere</button></div>`;
+      }
+      h += `</div>`;
+    });
+    h += `<button class="s" style="margin-top:10px" onclick="formTaller('${p.casoId}')">+ Agregar taller a mano</button></div>`;
+  });
+  d.cierres.forEach(c => {
+    h += `<div class="card"><div class="mu">Avisar que se cerró</div><b>${esc(c.titulo)}</b>`;
+    c.talleres.forEach(t => {
+      h += `<div class="env fila"><span>${esc(t.nombre)}</span>${t.wa ? `<a href="${t.wa}" target="_blank" style="color:var(--ac);font-weight:600">WhatsApp</a>` : ''}</div>`;
+    });
+    h += `<button class="p" style="margin-top:10px" onclick="run('marcarAvisado',[EMAIL,'${c.casoId}'],pintarAdmin,null,this)">Listo, avisados</button></div>`;
+  });
+  view(h);
+}
+function marcar(casoId, placeId, estado, repintar) {
+  google.script.run.withSuccessHandler(d => { if (repintar) pintarAdmin(d); })
+    .withFailureHandler(e => alert(e.message)).marcarEnvio(EMAIL, casoId, placeId, estado);
+}
+function formResp(casoId, placeId) {
+  abrir(`<h2>Respuesta del taller</h2>
+    <p class="mu">Copiá lo que te contestó el taller por WhatsApp y pegalo acá. Infi saca el precio, cuándo y qué incluye.</p>
+    <textarea id="rt" rows="5"></textarea><div class="err" id="me"></div>
+    <button class="p" onclick="run('cargarRespuesta',[EMAIL,'${casoId}','${placeId}',$('rt').value],pintarAdmin,'me',this)">Guardar</button>`);
+}
+function formTaller(casoId) {
+  abrir(`<h2>Agregar taller a mano</h2>
+    <input id="tn" placeholder="Nombre del taller">
+    <input id="tt" type="tel" placeholder="WhatsApp con código de país (ej: 54 9 11 5555 5555)">
+    <div class="err" id="me"></div>
+    <button class="p" onclick="run('agregarTallerManual',[EMAIL,'${casoId}',$('tn').value,$('tt').value],pintarAdmin,'me',this)">Agregar</button>`);
+}
+
+EMAIL ? cargar() : login();
+</script>
+</body>
+</html>
