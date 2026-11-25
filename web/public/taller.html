@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autoinfinity Service · Talleres</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/icono-192.png">
+<style>
+body{margin:0;background:#f6f5f2;color:#1d1d1f;font:16px -apple-system,system-ui,sans-serif;line-height:1.4}
+.w{max-width:440px;margin:0 auto;padding:24px 16px}
+.marca{color:#0a7d5a;font-weight:700}
+label{display:block;font-size:14px;color:#6e6e73;margin:12px 0 4px}
+input{font:inherit;font-size:16px;width:100%;box-sizing:border-box;padding:13px;border:1px solid #e5e3de;border-radius:12px;background:#fff}
+button{font:inherit;font-weight:600;width:100%;margin-top:18px;padding:15px;border:0;border-radius:14px;background:#0a7d5a;color:#fff;cursor:pointer}
+button:disabled{opacity:.6}
+.err{color:#d33;font-size:14px;min-height:20px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="w"><p class="marca">Autoinfinity</p><div id="c"><p>Cargando…</p></div></div>
+<script>
+const p = new URLSearchParams(location.search), id = p.get('id'), t = p.get('t');
+const c = document.getElementById('c');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, x => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
+async function llamar(fn, args) {
+  const r = await fetch('/api/rpc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fn, args }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Algo falló');
+  return j.ok;
+}
+const listo = (titulo, texto) => { c.innerHTML = '<h2>' + titulo + '</h2><p>' + texto + '</p>'; };
+async function enviar(b) {
+  b.disabled = true; b.textContent = 'Enviando…';
+  try {
+    await llamar('altaTaller', [id, t, { nombre: document.getElementById('n').value, whatsapp: document.getElementById('w').value, email: document.getElementById('m').value }]);
+    listo('¡Listo!', 'Ya estás en nuestra lista. Te vamos a escribir cuando un cliente de tu zona necesite presupuesto.');
+  } catch (e) { b.disabled = false; b.textContent = 'Quiero recibir pedidos'; document.getElementById('r').textContent = e.message; }
+}
+(async () => {
+  try {
+    if (p.get('baja')) { await llamar('bajaTaller', [id, t]); return listo('Listo', 'No te vamos a escribir más. ¡Gracias!'); }
+    const d = await llamar('datosTaller', [id, t]);
+    c.innerHTML = '<h2>Sumate a Autoinfinity Service</h2>' +
+      '<p>' + esc(d.nombre) + ': dejanos dónde te mandamos los pedidos de presupuesto de clientes de tu zona. Sin intermediarios ni comisiones.</p>' +
+      '<label>Tu nombre</label><input id="n" autocomplete="name">' +
+      '<label>WhatsApp (con código de área)</label><input id="w" type="tel" value="' + esc(d.whatsapp) + '">' +
+      '<label>Mail (opcional)</label><input id="m" type="email" value="' + esc(d.email) + '">' +
+      '<button onclick="enviar(this)">Quiero recibir pedidos</button><div class="err" id="r"></div>';
+  } catch (e) { listo('Link inválido', 'Escribinos y te sumamos a mano.'); }
+})();
+</script>
+</body>
+</html>

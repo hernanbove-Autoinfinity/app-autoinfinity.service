@@ -1,0 +1,13 @@
+{
+  "name": "autoinfinity-service",
+  "private": true,
+  "type": "module",
+  "description": "Autoinfinity Service: app para clientes (Vercel + Supabase)",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "importar": "node scripts/importar-desde-sheets.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4"
+  }
+}
