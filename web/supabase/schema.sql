@@ -203,3 +203,14 @@ alter table contactos      enable row level security;
 alter table busquedas      enable row level security;
 alter table uso_ia         enable row level security;
 revoke execute on function talleres_cerca(double precision, double precision, double precision, text) from public, anon, authenticated;
+
+-- ---------- Permisos para el servidor ----------
+-- Los proyectos nuevos de Supabase pueden venir sin permisos automáticos: se los damos explícitos
+-- SOLO a la clave de servicio (la que usa Vercel). La clave pública no recibe nada.
+grant usage on schema public to service_role;
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+grant execute on function km_entre(double precision, double precision, double precision, double precision) to service_role;
+grant execute on function talleres_cerca(double precision, double precision, double precision, text) to service_role;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
