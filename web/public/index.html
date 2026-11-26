@@ -22,7 +22,7 @@ h2{font-size:20px;margin:6px 0 14px}
 p{margin:8px 0}
 .top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:16px;min-height:40px}
 .marca{display:flex;align-items:center;gap:8px;font-weight:700;font-size:19px}
-.marca img{height:36px;width:auto;display:block}
+.marca img{height:44px;width:auto;display:block}
 .card{background:var(--card);border:1px solid var(--ln);border-radius:18px;padding:16px;margin-bottom:12px}
 .tap{cursor:pointer}
 .km{font-size:34px;font-weight:700;letter-spacing:-.5px}
@@ -133,7 +133,7 @@ function cerrar() { $('modal').classList.add('hide'); }
 $('modal').onclick = e => { if (e.target.id === 'modal') cerrar(); };
 const volver = (t, fn) => `<button class="mini" onclick="${fn || 'cargar()'}">← ${t || 'Inicio'}</button>`;
 // Logo: si todavía no está el archivo, muestra el nombre en texto
-const marca = () => `<div class="marca"><img src="/logo-service.png" alt="Autoinfinity Service" onerror="this.outerHTML='Autoinfinity Service'"></div>`;
+const marca = () => `<div class="marca"><picture><source srcset="/logo-service-oscuro.png" media="(prefers-color-scheme: dark)"><img src="/logo-service-claro.png" alt="Autoinfinity Service"></picture></div>`;
 
 // Achica la foto antes de mandarla (más rápido y más barato)
 function achicar(archivo, max) {
