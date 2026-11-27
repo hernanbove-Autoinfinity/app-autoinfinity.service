@@ -70,6 +70,15 @@ details summary{cursor:pointer;font-weight:600}
 .linea{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--ln);cursor:pointer}
 .linea b{font-weight:600;font-size:15px}
 .reloj{color:var(--wa);font-weight:600}
+.comp .cot{border-top:1px solid var(--ln);padding:12px 0}
+.comp .cot.abierta{background:var(--bg);margin:0 -16px;padding:12px 16px}
+.comp .precio{font-size:17px;white-space:nowrap}
+.comp .of{font-size:11px;font-weight:700;color:#fff;background:var(--tx);border-radius:6px;padding:1px 6px;vertical-align:2px}
+.comp .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.comp .tags span{font-size:12px;font-weight:600;color:var(--ac);border:1px solid var(--ac);border-radius:20px;padding:1px 8px}
+.comp .det{margin-top:8px}
+.comp .det p{margin:6px 0}
+.chip.mini2{font-size:13px;padding:6px 10px}
 .pie{display:flex;gap:8px;margin-top:14px}
 .pie button{flex:1;padding:12px;font-size:15px}
 .menu button{margin-bottom:8px;text-align:left;padding:14px 16px}
@@ -466,7 +475,7 @@ function elegirModo(id) {
     <div class="err" id="me"></div>`);
 }
 function pedir(id, modo, b) { run('pedirCotizaciones', [id, modo], c => { cerrar(); pintarCaso(c); }, 'me', b); }
-function abrirCaso(id) { cerrar(); cargando(); run('verCaso', [id], pintarCaso); }
+function abrirCaso(id) { cerrar(); cargando(); ABIERTA = null; FILTRO = 'todos'; ORDEN = 'precio'; run('verCaso', [id], pintarCaso); }
 
 function pintarCaso(c) {
   CASO = c;
@@ -510,7 +519,7 @@ function pintarCaso(c) {
         ${c.comentario ? `<p>${esc(c.comentario)}</p>` : ''}</div>`;
     }
   } else if (c.cotizaciones.length) {
-    h += `<h2>Cotizaciones (${c.cotizaciones.length})</h2>` + listaCots();
+    h += panelComparar();
     if (c.estado === 'listo') h += `<button class="s" style="margin-bottom:12px" onclick="cortar('${c.id}',this)">Ya lo resolví por mi cuenta</button>`;
   } else if (c.estado === 'listo' || c.estado === 'cerrado') {
     h += `<div class="card"><p style="margin-top:0">Esta vez ningún taller respondió a tiempo.</p></div>`;
@@ -525,38 +534,89 @@ function pintarCaso(c) {
     </details>`;
   view(h);
 }
-function listaCots() {
-  const cs = CASO.cotizaciones.slice();
-  if (ORDEN === 'precio') cs.sort((a, b) => (a.precio || 1e15) - (b.precio || 1e15));
-  if (ORDEN === 'resenas') cs.sort((a, b) => (b.rating - a.rating) || (b.resenas - a.resenas));
-  if (ORDEN === 'cerca') cs.sort((a, b) => (a.distancia == null ? 1e9 : a.distancia) - (b.distancia == null ? 1e9 : b.distancia));
-  return `<div class="chips">` + [['precio', 'Más barato'], ['resenas', 'Mejores reseñas'], ['cerca', 'Más cerca']]
-    .map(([k, t]) => `<button class="chip ${ORDEN === k ? 'on' : ''}" onclick="ORDEN='${k}';pintarCaso(CASO)">${t}</button>`).join('') + `</div>` +
-    cs.map(q => `<div class="card tap" onclick="verCot('${q.placeId}')">
-      <div class="fila"><b>${esc(q.nombre)}</b><b>${money(q.precio)}</b></div>
-      <div class="mu">${q.rating ? '⭐ ' + q.rating + ' (' + q.resenas + ' reseñas en Google)' : 'Sin reseñas en Google'}${q.distancia != null ? ' · ' + q.distancia + ' km' : ''}</div>
-      <div class="mu">${q.interna && !q.interna.faltan ? 'Autoinfinity: ★ ' + q.interna.prom + ' (' + q.interna.n + ' reseñas)' : 'Autoinfinity: faltan reseñas'}</div>
-      <div class="mu">${esc(q.cuando)}</div></div>`).join('');
+// ================= PANEL PARA COMPARAR PRESUPUESTOS =================
+// Todos los presupuestos en un solo cuadro: se comparan de un vistazo y se ordenan sin entrar y salir.
+let ABIERTA = null, FILTRO = 'todos';
+const reputacion = q => q.interna && !q.interna.faltan ? q.interna.prom : (q.rating || 0);
+const cantResenas = q => (q.interna && !q.interna.faltan ? q.interna.n : 0) + (q.resenas || 0);
+function fechaCorta(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00:00'), hoy = new Date(); hoy.setHours(12, 0, 0, 0);
+  const dias = Math.round((d - hoy) / 864e5);
+  if (dias <= 0) return 'Hoy';
+  if (dias === 1) return 'Mañana';
+  return d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' });
+}
+const ORDENES = [['precio', 'Precio'], ['cerca', 'Cercanía'], ['tiempo', 'Tiempo'], ['reputacion', 'Reputación']];
+function ordenar(cs) {
+  const ult = v => v == null ? 1e15 : v;
+  if (ORDEN === 'precio') cs.sort((a, b) => ult(a.precio || null) - ult(b.precio || null));
+  if (ORDEN === 'cerca') cs.sort((a, b) => ult(a.distancia) - ult(b.distancia));
+  if (ORDEN === 'tiempo') cs.sort((a, b) => ult(a.disponible ? Date.parse(a.disponible) : null) - ult(b.disponible ? Date.parse(b.disponible) : null));
+  if (ORDEN === 'reputacion') cs.sort((a, b) => (reputacion(b) - reputacion(a)) || (cantResenas(b) - cantResenas(a)));
+  return cs;
+}
+// Etiquetas para ver al toque quién gana en qué
+function etiquetas(cs) {
+  const t = {}, poner = (q, txt) => { if (q) (t[q.placeId] = t[q.placeId] || []).push(txt); };
+  const con = f => cs.filter(f);
+  const min = (arr, f) => arr.reduce((m, q) => (m == null || f(q) < f(m)) ? q : m, null);
+  const max = (arr, f) => arr.reduce((m, q) => (m == null || f(q) > f(m)) ? q : m, null);
+  if (cs.length > 1) {
+    poner(min(con(q => q.precio), q => q.precio), 'Más barato');
+    poner(min(con(q => q.disponible), q => Date.parse(q.disponible)), 'Más rápido');
+    poner(max(con(q => reputacion(q)), q => reputacion(q) * 100 + Math.min(cantResenas(q), 99)), 'Mejor puntuado');
+    poner(min(con(q => q.distancia != null), q => q.distancia), 'Más cerca');
+    // Recomendado: el más barato entre los bien puntuados (4,3 o más con reseñas suficientes)
+    poner(min(con(q => q.precio && reputacion(q) >= 4.3 && cantResenas(q) >= 10), q => q.precio), '👍 Recomendado');
+  }
+  return t;
+}
+function panelComparar() {
+  const todas = CASO.cotizaciones.slice();
+  const hayOficiales = todas.some(q => q.oficial) && todas.some(q => !q.oficial);
+  const cs = ordenar(todas.filter(q => FILTRO === 'todos' || (FILTRO === 'oficial') === !!q.oficial));
+  const tags = etiquetas(todas);
+  let h = `<div class="card comp"><div class="fila"><h2 style="margin:0">Presupuestos</h2><span class="mu">${todas.length} talleres</span></div>
+    <div class="mu" style="margin-top:6px">Ordenar por</div>
+    <div class="chips" style="margin-top:6px">` + ORDENES.map(([k, t]) =>
+      `<button class="chip mini2 ${ORDEN === k ? 'on' : ''}" onclick="ORDEN='${k}';ABIERTA=null;repintar()">${t}</button>`).join('') + `</div>`;
+  if (hayOficiales) h += `<div class="chips" style="margin-top:0">` + [['todos', 'Todos'], ['oficial', 'Oficiales'], ['otros', 'Lubricentros y talleres']].map(([k, t]) =>
+      `<button class="chip mini2 ${FILTRO === k ? 'on' : ''}" onclick="FILTRO='${k}';ABIERTA=null;repintar()">${t}</button>`).join('') + `</div>`;
+  h += cs.map(q => {
+    const abierta = ABIERTA === q.placeId;
+    const rep = q.interna && !q.interna.faltan ? `★ ${q.interna.prom} Autoinfinity (${q.interna.n})` : q.rating ? `★ ${q.rating} (${q.resenas})` : 'Sin reseñas';
+    const cuando = q.disponible ? '📅 ' + fechaCorta(q.disponible) : (q.cuando ? '📅 ' + q.cuando : '');
+    return `<div class="cot ${abierta ? 'abierta' : ''}">
+      <div class="tap" onclick="ABIERTA=${abierta ? 'null' : `'${q.placeId}'`};repintar()">
+        <div class="fila"><b>${esc(q.nombre)}${q.oficial ? ' <span class="of">Oficial</span>' : ''}</b><b class="precio">${money(q.precio)}</b></div>
+        <div class="mu">${rep}${q.distancia != null ? ' · ' + q.distancia + ' km' : ''}${cuando ? ' · ' + esc(cuando) : ''}</div>
+        ${(tags[q.placeId] || []).length ? `<div class="tags">${tags[q.placeId].map(x => `<span>${x}</span>`).join('')}</div>` : ''}
+      </div>
+      ${abierta ? `<div class="det">
+        ${q.incluye ? `<p><b>Incluye:</b> ${esc(q.incluye)}</p>` : ''}
+        ${q.cuando ? `<p><b>Cuándo:</b> ${esc(q.cuando)}</p>` : ''}
+        ${q.rubro ? `<p class="mu">${esc(q.rubro)}</p>` : ''}
+        <p class="mu">📍 ${esc(q.direccion)}</p>
+        ${bloqueResenas(q.interna)}
+        ${q.googleId ? `<a href="${fichaGoogle(q)}" target="_blank" rel="noopener" style="color:var(--ac);font-weight:600;font-size:14px">Ver reseñas y fotos en Google</a>` : ''}
+        <div class="row">
+          <a class="btn s" href="${waLink(q.telefono, 'Hola! Vengo de Autoinfinity Service por el presupuesto de: ' + CASO.titulo)}" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="btn s" href="${telLink(q.telefono)}">Llamar</a></div>
+        ${CASO.estado === 'listo' || CASO.estado === 'cotizando' ? `<button class="p" style="margin-top:8px" onclick="elegir('${q.placeId}',this)">Elegir este taller</button>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+  return h + `<p class="mu" style="margin-bottom:0">Tocá un taller para ver el detalle, contactarlo o elegirlo.</p></div>`;
+}
+// Vuelve a dibujar sin saltar arriba de todo
+function repintar() { const y = window.scrollY; pintarCaso(CASO); window.scrollTo(0, y); }
+function elegir(pid, b) {
+  if (!confirm('¿Elegís este taller? Les avisamos a los demás que ya lo resolviste.')) return;
+  run('elegirTaller', [CASO.id, pid], c => { ABIERTA = null; pintarCaso(c); }, null, b);
 }
 const fichaGoogle = e => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(e.nombre + ' ' + (e.direccion || '')) +
   (e.googleId ? '&query_place_id=' + e.googleId : '');
-function verCot(pid) {
-  const q = CASO.cotizaciones.find(x => x.placeId === pid);
-  abrir(`<h2>${esc(q.nombre)}</h2>
-    <div class="km" style="font-size:28px">${money(q.precio)}</div>
-    ${q.incluye ? `<p><b>Incluye:</b> ${esc(q.incluye)}</p>` : ''}
-    ${q.cuando ? `<p><b>Cuándo:</b> ${esc(q.cuando)}</p>` : ''}
-    <p class="mu">${esc(q.direccion)}${q.distancia != null ? ' · a ' + q.distancia + ' km' : ''}</p>
-    ${q.googleId ? `<p class="mu">Google: ${q.rating ? '★ ' + q.rating + ' (' + q.resenas + ' reseñas)' : 'sin reseñas'}</p>
-      <a class="btn s" href="${fichaGoogle(q)}" target="_blank" rel="noopener">Ver reseñas y fotos en Google</a>` : ''}
-    ${bloqueResenas(q.interna)}
-    <div class="row" style="margin-bottom:10px">
-      <a class="btn s" href="${waLink(q.telefono, 'Hola! Vengo de Autoinfinity Service por el presupuesto de: ' + CASO.titulo)}" target="_blank" rel="noopener">WhatsApp</a>
-      <a class="btn s" href="${telLink(q.telefono)}">Llamar</a></div>
-    <div class="err" id="me"></div>
-    ${CASO.estado === 'listo' || CASO.estado === 'cotizando' ? `<button class="p" onclick="run('elegirTaller',[CASO.id,'${pid}'],c=>{cerrar();pintarCaso(c)},'me',this)">Elegí este taller</button>
-    <p class="mu">Al elegirlo cerramos el pedido y les avisamos a los demás.</p>` : ''}`);
-}
 function formModificar() {
   abrir(`<h2>Modificar pedido</h2>
     <p class="mu">Cambiá lo que necesitás (por ejemplo, 2 cubiertas en vez de 4). Les avisamos a los talleres y las cotizaciones anteriores se borran.</p>

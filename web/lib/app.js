@@ -4,7 +4,7 @@
 // a partir de la sesión, el celular no lo puede inventar.
 // =====================================================================
 import {
-  db, q, aviso, esAdmin, soloAdmin, admins, appUrl, f, fd, fdc, sumarHorasHabiles, fmtKm, lindo,
+  db, q, aviso, esAdmin, soloAdmin, admins, appUrl, f, fd, fdc, diaSemana, sumarHorasHabiles, fmtKm, lindo,
   distancia, redondo1, normTel, esCelular, waLink, firmaOk, linkAlta, linkBaja, esc, env
 } from './base.js';
 import {
@@ -41,7 +41,8 @@ export const BUSQUEDA = {
   'cerrajería': 'cerrajería del automotor llaves',
   'audio y alarmas': 'audio y alarmas para autos',
   'lavadero': 'lavadero de autos',
-  'gnc': 'taller de GNC'
+  'gnc': 'taller de GNC',
+  'lubricentro': 'lubricentro cambio de aceite y filtros'
 };
 const RUBROS = Object.keys(BUSQUEDA);
 const TALLERES = RUBROS.join('|');
@@ -49,7 +50,7 @@ const GUIA_RUBRO = ' Elegí bien el rubro del taller: cubiertas/neumáticos → 
   'bollo sin pintura dañada → sacabollos; luces, batería, arranque, tablero → electricidad; pulido, encerado, limpieza profunda → detailing; ' +
   'butacas, alfombras, techo interior → tapicería; parabrisas o vidrios → cristales; aire que no enfría → aire acondicionado; ' +
   'el auto tira para un lado o vibra el volante → alineación y tren delantero; ruido de caño de escape → escapes; ' +
-  'llaves o cerraduras → cerrajería; estéreo o alarma → audio y alarmas; motor, frenos, embrague, service, ruidos → mecánica.';
+  'llaves o cerraduras → cerrajería; estéreo o alarma → audio y alarmas; cambio de aceite y filtros → lubricentro; motor, frenos, embrague, service, ruidos → mecánica.';
 const EJEMPLO_RUBRO = {
   'gomería': ['cambiar 4 cubiertas', 'gomerías'], 'mecánica': ['hacer el cambio de distribución', 'talleres mecánicos'],
   'chapa y pintura': ['pintar un paragolpe', 'talleres de chapa y pintura'], 'sacabollos': ['sacar un bollo de una puerta', 'sacabollos'],
@@ -59,8 +60,22 @@ const EJEMPLO_RUBRO = {
   'alineación y tren delantero': ['hacer alineación y balanceo', 'talleres de tren delantero'],
   'escapes': ['cambiar el silenciador', 'casas de escapes'], 'cerrajería': ['hacer una copia de llave', 'cerrajerías'],
   'audio y alarmas': ['instalar una alarma', 'casas de audio y alarmas'], 'lavadero': ['un lavado completo', 'lavaderos'],
-  'gnc': ['revisar el equipo de GNC', 'talleres de GNC']
+  'gnc': ['revisar el equipo de GNC', 'talleres de GNC'],
+  'lubricentro': ['hacer el service de los 60.000 km', 'lubricentros'],
+  'oficial': ['hacer el service de los 60.000 km', 'talleres oficiales']
 };
+
+// Talleres oficiales de una marca: se guardan con el rubro "oficial <marca>" (ej: "oficial toyota")
+const rubroOficial = marca => 'oficial ' + String(marca || '').trim().toLowerCase();
+const esOficial = tipo => String(tipo || '').startsWith('oficial ');
+const textoBusqueda = tipo => BUSQUEDA[tipo] || (esOficial(tipo)
+  ? 'concesionario oficial ' + tipo.slice(8) + ' taller service' : tipo);
+const ejemploRubro = tipo => EJEMPLO_RUBRO[esOficial(tipo) ? 'oficial' : tipo] || EJEMPLO_RUBRO['mecánica'];
+// Los oficiales son menos: se buscan más lejos
+const radiosDe = tipo => esOficial(tipo) ? [10, 25, 40] : RADIOS_KM;
+
+// Service: 5 oficiales de la marca + 5 lubricentros/talleres (mínimo ideal: 3 y 3)
+const SERVICE_POR_GRUPO = 5;
 
 // ================== ESQUEMAS E INSTRUCCIONES DE INFI ==================
 const TXT = { type: 'string' };
@@ -71,7 +86,8 @@ const ESQ_PROBLEMA = { type: 'object', properties: {
 const ESQ_PRESUPUESTO = { type: 'object', properties: { pregunta: TXT, opciones: LISTA, titulo: TXT, detalle: TXT, tipoTaller: { type: 'string', enum: RUBROS }, trabajoTaller: TXT } };
 const ESQ_RESPUESTA = { type: 'object', properties: {
   cotiza: { type: 'boolean' }, precio: { type: 'number', description: 'precio total principal en pesos, entero, ej 450000; 0 si no dice' },
-  cuando: TXT, incluye: TXT }, required: ['cotiza'] };
+  cuando: TXT, incluye: TXT,
+  disponible: { type: 'string', description: 'la fecha más temprana en que pueden hacer el trabajo, formato AAAA-MM-DD; vacío si no dice' } }, required: ['cotiza'] };
 const ESQ_TABLERO = { type: 'object', properties: {
   km: { type: 'integer', description: 'kilometraje TOTAL (odómetro), sin puntos; 0 si no se ve' },
   esTotal: { type: 'boolean', description: 'true si estás seguro de que es el total y no un parcial (Trip A/B)' },
@@ -289,7 +305,7 @@ async function buscarEnGoogle(lat, lng, tipo, radioKm) {
   const antes = await q(db().from('busquedas').select('fecha').eq('clave', clave).maybeSingle());
   if (antes && Date.now() - new Date(antes.fecha) < 30 * 864e5) return 0;
   await q(db().from('busquedas').upsert({ clave, fecha: new Date().toISOString() }));
-  const lugares0 = await buscarLugares(BUSQUEDA[tipo] || tipo, lat, lng, radioKm);
+  const lugares0 = await buscarLugares(textoBusqueda(tipo), lat, lng, radioKm);
   const gids = lugares0.map(p => p.id);
   const ya = gids.length ? (await q(db().from('talleres').select('google_id').eq('tipo', tipo).in('google_id', gids))).map(t => t.google_id) : [];
   let lugares = lugares0.filter(p => (p.internationalPhoneNumber || p.websiteUri) && !ya.includes(p.id) &&
@@ -298,7 +314,8 @@ async function buscarEnGoogle(lat, lng, tipo, radioKm) {
   if (lugares.length) {
     try {
       const r = await ia(MODELO_BARATO(), 'Filtrás negocios de Google Maps en Argentina. Devolvé los números de los que SÍ son del rubro pedido. ' +
-        'Ante la duda, dejalo afuera.', [{ role: 'user', content: 'Rubro: ' + tipo + '\n' +
+        (esOficial(tipo) ? 'Rubro oficial: SOLO concesionarios o talleres OFICIALES de esa marca (no multimarca, no lubricentros, no repuestos). ' : '') +
+        'Ante la duda, dejalo afuera.', [{ role: 'user', content: 'Rubro: ' + (esOficial(tipo) ? 'concesionario o taller oficial ' + tipo.slice(8) : tipo) + '\n' +
         lugares.map((p, n) => n + ') ' + p.displayName.text + (p.primaryTypeDisplayName ? ' [' + p.primaryTypeDisplayName.text + ']' : '')).join('\n') }],
         500, { type: 'object', properties: { sirven: { type: 'array', items: { type: 'integer' } } }, required: ['sirven'] });
       lugares = lugares.filter((p, n) => (r.sirven || []).includes(n));
@@ -311,25 +328,39 @@ async function buscarEnGoogle(lat, lng, tipo, radioKm) {
   return lugares.length;
 }
 
-async function buscarTalleres(a, tipo) {
+// Busca talleres de un rubro cerca del auto. Agranda la distancia hasta llegar a "minimo".
+async function buscarTalleres(a, tipo, cuantos, minimo) {
+  cuantos = cuantos || MAX_TALLERES; minimo = minimo || MIN_POR_RUBRO;
   let lat = a.lat, lng = a.lng;
   if (!lat) {
     [lat, lng] = await geocodificar(a.direccion);
     if (!lat) return [];
     await q(db().from('autos').update({ lat, lng }).eq('id', a.id));
+    a.lat = lat; a.lng = lng;
   }
   const cerca = async km => (await talleresCerca(lat, lng, km, tipo)).filter(t => t.en_lista !== 'no' && t.telefono);
-  // Primero cerca; si hay menos de 5, se agranda la distancia
   let lista = [];
-  for (const km of RADIOS_KM) {
+  for (const km of radiosDe(tipo)) {
     lista = await cerca(km);
-    if (lista.length < MAX_TALLERES && await buscarEnGoogle(lat, lng, tipo, km)) lista = await cerca(km);
-    if (lista.length >= MIN_POR_RUBRO) break;
+    if (lista.length < cuantos && await buscarEnGoogle(lat, lng, tipo, km)) lista = await cerca(km);
+    if (lista.length >= minimo) break;
   }
   const puntaje = t => (t.en_lista === 'si' ? 1000 : 0) + (esCelular(t.telefono) ? 100 : 0) + Number(t.rating) * Math.log10(Number(t.resenas) + 1) - t.km;
   const buenos = lista.filter(t => t.en_lista === 'si' || (Number(t.rating) >= 4 && Number(t.resenas) >= 10));
   const resto = lista.filter(t => !buenos.includes(t));
-  return buenos.sort((x, y) => puntaje(y) - puntaje(x)).concat(resto.sort((x, y) => puntaje(y) - puntaje(x))).slice(0, MAX_TALLERES);
+  return buenos.sort((x, y) => puntaje(y) - puntaje(x)).concat(resto.sort((x, y) => puntaje(y) - puntaje(x))).slice(0, cuantos);
+}
+
+// Service: 5 talleres oficiales de la marca + 5 lubricentros (si faltan lubricentros, se completa con talleres mecánicos)
+async function talleresParaService(a) {
+  const oficiales = await buscarTalleres(a, rubroOficial(a.marca), SERVICE_POR_GRUPO, SERVICE_POR_GRUPO);
+  let otros = await buscarTalleres(a, 'lubricentro', SERVICE_POR_GRUPO, SERVICE_POR_GRUPO);
+  if (otros.length < SERVICE_POR_GRUPO) {
+    const ya = new Set(otros.map(t => t.google_id || t.id));
+    const mec = (await buscarTalleres(a, 'mecánica', SERVICE_POR_GRUPO, SERVICE_POR_GRUPO)).filter(t => !ya.has(t.google_id || t.id));
+    otros = otros.concat(mec).slice(0, SERVICE_POR_GRUPO);
+  }
+  return { lista: oficiales.concat(otros), oficiales: oficiales.length, otros: otros.length };
 }
 
 // ================== MENSAJES PARA TALLERES ==================
@@ -338,7 +369,7 @@ function mensajeTaller(c, a, primeraVez) {
   const pedido = 'Auto: ' + lindo(a.marca + ' ' + a.modelo) + ' ' + a.anio + '\n' + 'Trabajo: ' + c.pedido + '\n\n' + plazo;
   if (c.modificado) return 'Hola! Te escribo de nuevo de Autoinfinity: el cliente cambió el pedido. ¿Me pasás presupuesto con esto?\n\n' + pedido + ' ¡Gracias!';
   if (!primeraVez) return 'Hola! Te escribo de Autoinfinity. ¿Me pasás presupuesto y cuándo lo podrías hacer?\n\n' + pedido + ' ¡Gracias!';
-  const ej = EJEMPLO_RUBRO[c.tipo_taller] || EJEMPLO_RUBRO['mecánica'];
+  const ej = ejemploRubro(c.tipo_taller);
   return 'Hola! Somos Autoinfinity, agencia de autos. Con nuestra app, cuando un cliente necesita, por ejemplo, ' + ej[0] +
     ', le pedimos presupuesto a ' + ej[1] + ' de su zona y él elige y te contacta directo. Sin intermediarios ni comisiones.\n\n' +
     'Ahora tengo este pedido cerca tuyo:\n' + pedido + '\n\n' +
@@ -347,7 +378,7 @@ function mensajeTaller(c, a, primeraVez) {
 const mensajeCierre = c => 'Hola! Te escribo de Autoinfinity por el presupuesto de ' + c.pedido +
   '. El cliente ya lo resolvió, así que lo cerramos. ¡Gracias, pronto te mandamos más trabajos!';
 function mensajeInvitacion(t) {
-  const ej = EJEMPLO_RUBRO[t.tipo] || EJEMPLO_RUBRO['mecánica'];
+  const ej = ejemploRubro(t.tipo);
   return 'Hola! Somos Autoinfinity, agencia de autos. Con nuestra app, cuando un cliente de tu zona necesita, por ejemplo, ' + ej[0] +
     ', le pedimos presupuesto a ' + ej[1] + ' cercanos y él te contacta directo. Sin intermediarios ni comisiones.\n\n' +
     '¿Querés recibir pedidos? Dejanos tus datos acá (1 minuto): ' + linkAlta(t.id);
@@ -407,13 +438,19 @@ export async function pedirCotizaciones(email, casoId, modo) {
   const c = await casoMio(email, casoId);
   if (c.estado !== 'nuevo') aviso('Este pedido ya se envió');
   const a = await q(db().from('autos').select('*').eq('id', c.auto_id).single());
-  const lista = await buscarTalleres(a, c.tipo_taller || 'mecánica');
+  let lista, nota = '';
+  if (c.tipo === 'service') {
+    const r = await talleresParaService(a);
+    lista = r.lista;
+    nota = ' (' + r.oficiales + ' oficiales ' + a.marca + ' + ' + r.otros + ' lubricentros/talleres)' +
+      (r.oficiales < 3 || r.otros < 3 ? ' ⚠️ No llegamos a 3 y 3: sumá talleres a mano desde el panel.' : '');
+  } else lista = await buscarTalleres(a, c.tipo_taller || 'mecánica');
   const vence = modo === 'urgente' ? sumarHorasHabiles(new Date(), HORAS_URGENTE) : new Date(Date.now() + HORAS_NORMAL * 36e5);
   if (lista.length) await q(db().from('envios').upsert(lista.map(t => ({ caso_id: casoId, taller_id: t.id })), { onConflict: 'caso_id,taller_id', ignoreDuplicates: true }));
   await q(db().from('casos').update({ modo, vence: vence.toISOString(), estado: 'cotizando' }).eq('id', casoId));
   const wa = await enviarPedidoWhatsApp(casoId).catch(e => { console.error('WhatsApp pedido', e); return { enviados: 0 }; });
   await avisarAdmins((modo === 'urgente' ? 'URGENTE: ' : '') + 'Nuevo pedido para cotizar: ' + c.titulo,
-    'Hay ' + lista.length + ' talleres.' + (lista.length ? '' : ' No se encontraron solos: agregalos a mano.') +
+    'Hay ' + lista.length + ' talleres' + nota + '.' + (lista.length ? '' : ' No se encontraron solos: agregalos a mano.') +
     (wa.enviados ? ' Se mandaron ' + wa.enviados + ' WhatsApp' + (waModoPrueba() ? ' (modo prueba: te llegan a vos).' : '.') : '') +
     '\nPanel Autoinfinity: ' + appUrl());
   return verCaso(email, casoId);
@@ -446,7 +483,8 @@ export async function verCaso(email, casoId) {
       placeId: t.id, googleId: t.google_id || '', nombre: t.nombre || '', telefono: t.whatsapp || t.telefono || '',
       direccion: t.direccion || '', rating: Number(t.rating) || 0, resenas: Number(t.resenas) || 0,
       distancia: (a.lat && t.lat) ? redondo1(distancia(a.lat, a.lng, t.lat, t.lng)) : null,
-      precio: Number(x.precio) || 0, cuando: x.cuando || '', incluye: x.incluye || '', interna: await resenasTaller(t.id)
+      precio: Number(x.precio) || 0, cuando: x.cuando || '', incluye: x.incluye || '', interna: await resenasTaller(t.id),
+      disponible: x.disponible || null, oficial: esOficial(t.tipo), rubro: esOficial(t.tipo) ? 'Oficial ' + lindo(t.tipo.slice(8)) : (t.tipo || '')
     };
   }));
   const el = c.taller_elegido ? await q(db().from('talleres').select('*').eq('id', c.taller_elegido).maybeSingle()) : null;
@@ -628,11 +666,17 @@ export async function cargarRespuesta(email, casoId, tallerId, texto) {
   texto = String(texto || '').trim().slice(0, 3000);
   if (!texto) aviso('Pegá la respuesta del taller');
   const c = await q(db().from('casos').select('*').eq('id', casoId).single());
-  const r = await ia(MODELO_BARATO(), 'Leé la respuesta de un taller argentino a un pedido de presupuesto. Respondé SOLO JSON: ' +
-    '{"cotiza":true o false,"precio":número en pesos sin puntos ni signos o null,"cuando":"cuándo lo pueden hacer, corto","incluye":"qué incluye el precio, corto"}',
+  const hoy = new Date();
+  const r = await ia(MODELO_BARATO(), 'Leé la respuesta de un taller argentino a un pedido de presupuesto. Hoy es ' + diaSemana(hoy) + ' ' + fd(hoy) +
+    '. Respondé SOLO JSON: {"cotiza":true o false,"precio":número en pesos sin puntos ni signos o null,"cuando":"cuándo lo pueden hacer, corto",' +
+    '"incluye":"qué incluye el precio, corto","disponible":"AAAA-MM-DD, la fecha más temprana en que lo pueden hacer, o vacío"}',
     [{ role: 'user', content: 'Pedido: ' + c.pedido + '\nRespuesta del taller: ' + texto }], 800, ESQ_RESPUESTA);
   if (!r.cotiza) { await q(db().from('envios').update({ estado: 'no cotiza' }).eq('caso_id', casoId).eq('taller_id', tallerId)); return panelAdmin(email); }
-  await q(db().from('cotizaciones').insert({ caso_id: casoId, taller_id: tallerId, precio: r.precio || null, cuando: r.cuando || '', incluye: r.incluye || '', texto }));
+  const fila = { caso_id: casoId, taller_id: tallerId, precio: r.precio || null, cuando: r.cuando || '', incluye: r.incluye || '', texto };
+  const disp = /^\d{4}-\d{2}-\d{2}$/.test(String(r.disponible || '')) ? r.disponible : null;
+  // Si la base todavía no tiene la columna "disponible" (falta correr el SQL nuevo), se guarda igual sin ella
+  const { error } = await db().from('cotizaciones').insert(Object.assign({}, fila, { disponible: disp }));
+  if (error) await q(db().from('cotizaciones').insert(fila));
   await q(db().from('envios').update({ estado: 'respondio' }).eq('caso_id', casoId).eq('taller_id', tallerId));
   if (c.modo === 'urgente') await avisarCliente(c, 'Llegó una cotización: ' + c.titulo, 'Entrá a la app para verla: ' + appUrl());
   return panelAdmin(email);
@@ -761,7 +805,7 @@ async function buscarMails(talleres) {
 
 async function invitarPorMail(rubro, ids, cupo) {
   if (cupo <= 0 || !ids.length) return 0;
-  const ej = EJEMPLO_RUBRO[rubro] || EJEMPLO_RUBRO['mecánica'];
+  const ej = ejemploRubro(rubro);
   const lista = await q(db().from('talleres').select('*').in('id', ids).neq('email', '').eq('invitado', '').is('en_lista', null).limit(cupo));
   let n = 0;
   for (const t of lista) {

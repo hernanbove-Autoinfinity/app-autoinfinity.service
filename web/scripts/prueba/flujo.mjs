@@ -21,7 +21,7 @@ globalThis.fetch = async (url, o = {}) => {
     const s = body.system;
     if (s.includes('Filtrás negocios')) return tool({ sirven: [0, 1, 2, 3] });
     if (s.includes('Leés el tablero')) return tool({ km: 132450, esTotal: true, nota: '' });
-    if (s.includes('Leé la respuesta')) return tool({ cotiza: true, precio: 450000, cuando: 'Miércoles 18', incluye: 'Mano de obra y balanceo' });
+    if (s.includes('Leé la respuesta')) return tool({ cotiza: true, precio: 450000, cuando: 'Miércoles 18', incluye: 'Mano de obra y balanceo', disponible: '2026-12-02' });
     if (body.messages.length === 1) return tool({ pregunta: '¿Qué marca preferís?', opciones: ['Michelin', 'La más barata'] });
     return tool({ titulo: 'Cambio de 4 cubiertas', detalle: '4 cubiertas Michelin 225/55 R18', tipoTaller: 'gomería', trabajoTaller: '4 cubiertas Michelin 225/55 R18' });
   }
@@ -130,6 +130,15 @@ c = await app.cortarCaso(U, caso2); assert.equal(c.estado, 'cerrado'); ok('pedid
 // 11. Service
 const s = await app.casoService(U, auto.id);
 c = await app.verCaso(U, s.id); assert.equal(c.titulo, 'Service de los 140.000 km'); assert.equal(c.pedido, 'Service de los 140.000 km'); ok('caso de service sin plan detallado');
+c = await app.pedirCotizaciones(U, s.id, 'normal');
+const tiposService = dbf.T.envios.filter(e => e.caso_id === s.id).map(e => dbf.T.talleres.find(t => t.id === e.taller_id).tipo);
+assert.equal(tiposService.filter(t => t === 'oficial peugeot').length, 4); assert.equal(tiposService.filter(t => t === 'lubricentro').length, 4);
+ok('service: pidió a 4 oficiales Peugeot + 4 lubricentros (los que hay cerca)');
+const ofi = dbf.T.envios.find(e => e.caso_id === s.id && dbf.T.talleres.find(t => t.id === e.taller_id).tipo === 'oficial peugeot');
+await app.cargarRespuesta(A, s.id, ofi.taller_id, 'El service sale 380 mil, te lo hacemos el martes 2');
+c = await app.forzarInforme(A, s.id);
+assert.equal(c.cotizaciones[0].oficial, true); assert.equal(c.cotizaciones[0].disponible, '2026-12-02'); assert.equal(c.cotizaciones[0].rubro, 'Oficial Peugeot');
+ok('cotización con fecha de disponibilidad (2026-12-02) y marcada como oficial');
 
 // 12. Reclutar: busca mail en la web y manda invitación con link firmado
 const mailsAntes = enviados.mails.length;

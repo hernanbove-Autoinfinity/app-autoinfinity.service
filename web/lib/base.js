@@ -44,6 +44,7 @@ function partes(d) {
 }
 export const f = d => { if (!d) return ''; const p = partes(d); return p.day + '/' + p.month + ' ' + p.hour + ':' + p.minute; };
 export const fd = d => { if (!d) return ''; const p = partes(d); return p.day + '/' + p.month + '/' + p.year; };
+export const diaSemana = d => new Intl.DateTimeFormat('es-AR', { timeZone: TZ, weekday: 'long' }).format(new Date(d));
 export const fdc = d => { if (!d) return ''; const p = partes(d); return p.day + '/' + p.month; };
 const DIAS = { lun: 1, mar: 2, mié: 3, mie: 3, jue: 4, vie: 5, sáb: 6, sab: 6, dom: 7 };
 export function diaHora(d) {

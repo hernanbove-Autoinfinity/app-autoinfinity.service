@@ -129,9 +129,11 @@ create table if not exists cotizaciones (
   precio     numeric,
   cuando     text not null default '',
   incluye    text not null default '',
-  texto      text not null default ''
+  texto      text not null default '',
+  disponible date                          -- desde cuándo lo pueden hacer (para ordenar por tiempos)
 );
 create index if not exists cotizaciones_caso on cotizaciones (caso_id);
+alter table cotizaciones add column if not exists disponible date;
 
 -- ---------- Zonas (de dónde duermen los autos) ----------
 create table if not exists zonas (
